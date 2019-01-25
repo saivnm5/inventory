@@ -12,6 +12,10 @@ class Item(models.Model):
 	last_user = models.CharField(max_length=255, default='admin')
 	tracker = FieldTracker()
 
+	def __str__(self):
+		return self.name
+
+
 class Variant(models.Model):
 	item = models.ForeignKey(Item, on_delete=models.PROTECT)
 	name = models.CharField(max_length=255)
@@ -20,6 +24,10 @@ class Variant(models.Model):
 	quantity = models.IntegerField()
 	is_active = models.BooleanField(default=True)
 	last_user = models.CharField(max_length=255, default='admin')
+	tracker = FieldTracker()
+
+	def __str__(self):
+		return self.name
 
 
 class VariantPropery(models.Model):
@@ -33,7 +41,7 @@ class VariantPropery(models.Model):
 class ItemChangeLog(models.Model):
 	item = models.ForeignKey(Item, on_delete=models.PROTECT)
 	attribute = models.CharField(max_length=255)
-	is_variant = models.BooleanField(default=False)
+	variant = models.ForeignKey(Variant, null=True, on_delete=models.PROTECT)
 	old_value = models.CharField(max_length=255)
 	new_value = models.CharField(max_length=255)
 	user = models.CharField(max_length=255)
@@ -72,26 +80,43 @@ def item_change_logger(sender, instance, created, raw, using, update_fields, **k
 			log.old_value = instance.tracker.previous('category')
 			log.save()
 
-'''
+
 @receiver(post_save, sender=Variant)
-def item_change_logger(sender, instance, created, raw, using, update_fields, **kwargs):
+def variant_change_logger(sender, instance, created, raw, using, update_fields, **kwargs):
 	
+	if created:
+		log = ItemChangeLog(item=instance.item, variant=instance, attribute='variant', user=instance.last_user)
+		log.new_value = True
+		log.old_value = False
+		log.save()
+
 	if not created:
 		if instance.tracker.has_changed('name'):
-			log = ItemChangeLog(item=instance, attribute='name', user='ghost')
-			log.old_value = instance.name 
-			log.new_value = instance.tracker.previous('name')
+			log = VariantChangeLog(variant=instance, attribute='name', user=instance.last_user)
+			log.new_value = instance.name 
+			log.old_value = instance.tracker.previous('name')
 			log.save()
 
 		if instance.tracker.has_changed('selling_price'):
-			log = ItemChangeLog(item=instance, attribute='selling_price', user='ghost')
-			log.old_value = instance.selling_price 
-			log.new_value = instance.tracker.previous('selling_price')
+			log = VariantChangeLog(variant=instance, attribute='selling_price', user=instance.last_user)
+			log.new_value = str(instance.selling_price)
+			log.old_value = str(instance.tracker.previous('selling_price'))
 			log.save()
 
-		if instance.tracker.has_changed('category'):
-			log = ItemChangeLog(item=instance, attribute='category', user='ghost')
-			log.old_value = instance.category 
-			log.new_value = instance.tracker.previous('category')
+		if instance.tracker.has_changed('cost_price'):
+			log = VariantChangeLog(variant=instance, attribute='cost_price', user=instance.last_user)
+			log.new_value = str(instance.cost_price )
+			log.old_value = str(instance.tracker.previous('cost_price'))
 			log.save()
-'''
+
+		if instance.tracker.has_changed('quantity'):
+			log = VariantChangeLog(variant=instance, attribute='quantity', user=instance.last_user)
+			log.new_value = instance.quantity 
+			log.old_value = instance.tracker.previous('quantity')
+			log.save()
+
+		if instance.tracker.has_changed('is_active'):
+			log = ItemChangeLog(item=instance.item, variant=instance, attribute='variant', user=instance.last_user)
+			log.new_value = instance.is_active
+			log.old_value = instance.tracker.previous('is_active')
+			log.save()
