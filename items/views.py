@@ -12,6 +12,7 @@ def group_changelog(rows):
 	#print(rows)
 
 	for i in range(1, len(rows)):
+		print(changelog_arr)
 		row = rows[i]
 		item_id = str(row[1])
 		attr = row[3]
@@ -19,15 +20,18 @@ def group_changelog(rows):
 			item_arr.append(item_id)
 			changelog_arr[item_id] = []
 			changelog_arr[item_id].append(attr)
+		else:
+			changelog_arr[item_id].append(attr)
 	return changelog_arr
 
 def get_pretty_notif(rows):
+	# TBD 
 	notif = []
 	for x in rows:
 		notif_part = ''
 		notif_string =  'For item id '+x+' these attributes were changed: '
 		for l in rows[x]:
-			notif_part = l+' '
+			notif_part = notif_part + l + ' '
 		notif.append(notif_string+notif_part)
 	return notif
 
