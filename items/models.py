@@ -30,12 +30,17 @@ class Variant(models.Model):
 		return self.name
 
 
-class VariantPropery(models.Model):
+class VariantProperty(models.Model):
 	# using EAV model
 	variant = models.ForeignKey(Variant, on_delete=models.PROTECT)
 	property = models.CharField(max_length=255)
 	value = models.CharField(max_length=255)
 	last_user = models.CharField(max_length=255, default='admin')
+	is_active = models.BooleanField(default=True)
+	tracker = FieldTracker()
+
+	def __str__(self):
+		return (self.variant.name+' '+self.property+': '+self.value)
 
 
 class ItemChangeLog(models.Model):
@@ -51,7 +56,8 @@ class ItemChangeLog(models.Model):
 class VariantChangeLog(models.Model):
 	variant = models.ForeignKey(Variant, on_delete=models.PROTECT)
 	attribute = models.CharField(max_length=255)
-	is_property = models.BooleanField(default=False)
+	is_property_change = models.BooleanField(default=False)
+	property = models.ForeignKey(VariantProperty, null=True, on_delete=models.PROTECT)
 	old_value = models.CharField(max_length=255)
 	new_value = models.CharField(max_length=255)
 	user = models.CharField(max_length=255)
@@ -117,6 +123,35 @@ def variant_change_logger(sender, instance, created, raw, using, update_fields, 
 
 		if instance.tracker.has_changed('is_active'):
 			log = ItemChangeLog(item=instance.item, variant=instance, attribute='variant', user=instance.last_user)
+			log.new_value = instance.is_active
+			log.old_value = instance.tracker.previous('is_active')
+			log.save()
+
+
+@receiver(post_save, sender=VariantProperty)
+def variant_property_change_logger(sender, instance, created, raw, using, update_fields, **kwargs):
+
+	if created:
+		log = VariantChangeLog(variant=instance.variant, attribute='property', property=instance, is_property_change=True, user=instance.last_user)
+		log.new_value = True
+		log.old_value = False
+		log.save()
+
+	if not created:
+		if instance.tracker.has_changed('property'):
+			log = VariantChangeLog(variant=instance.variant, attribute='property', property=instance, is_property_change=True, user=instance.last_user)
+			log.new_value = instance.property
+			log.old_value = instance.tracker.previous('property')
+			log.save()
+
+		if instance.tracker.has_changed('value'):
+			log = VariantChangeLog(variant=instance.variant, attribute='property', property=instance, user=instance.last_user)
+			log.new_value = instance.value
+			log.old_value = instance.tracker.previous('value')
+			log.save()
+
+		if instance.tracker.has_changed('is_active'):
+			log = VariantChangeLog(variant=instance.variant, attribute='property', property=instance, is_property_change=True, user=instance.last_user)
 			log.new_value = instance.is_active
 			log.old_value = instance.tracker.previous('is_active')
 			log.save()
